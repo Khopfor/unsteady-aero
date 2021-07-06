@@ -1,0 +1,11 @@
+{
+  "NACA": "0015",
+  "polarSource": "xfoil",
+  "Re": 135743,
+  "theta0": -3,
+  "x_A": 0.3,
+  "omega": 0.2,
+  "A_heaving": 0.05,
+  "phi": -90,
+  "A_pitching": 4
+}
