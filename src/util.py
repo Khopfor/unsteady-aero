@@ -1,16 +1,19 @@
 import os
 import os.path
 import sys
-import numpy as np
+sys.path.append('./src')
 import matplotlib.pyplot as plt
 from scipy.special import hankel2
 from scipy import optimize
 import pandas as pd
-from math import *
-from time import sleep
+from threading import Thread
+from maths import *
 import json
+import time
+import glob
 
-from params import *
+CURRENTPARAMSJSON='current-params.json'
+PARAMSJSON='params.json'
 
 def writeList (filePath,l):
     file=open(filePath,'w')
@@ -25,21 +28,12 @@ def readList (filePath):
     file.close()
     return lines
 
-def rotY (angle):
-    return np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
-
-def deg2rad (angle):
-    return angle*np.pi/180
-
-def rad2deg (angle):
-    return angle*180/np.pi
-
-def integrate (f,a,b,N=100):
-    dx=(b-a)/N
-    sum=0
-    for i in range(N):
-        sum+=dx*(f(a+(i+1)*dx)+f(a+i*dx))/2
-    return sum
+def findSubList (l,expr):
+    res=[]
+    for v in l :
+        if v.find(expr) :
+            res.append(v)
+    return res
 
 
 def subplotMaker (sub, title="",xlabel="",ylabel="",grid=False,equal=True,xlim=None,ylim=None):
@@ -65,8 +59,6 @@ def writeDataToFile (X,Y, fileName):
                 f.write(str(X[i])+" "+str(Y[i])+"\n")
         f.close()
 
-def zero (t):
-    return 0
 
 def printParameters (Re,chord,airfoil,omega,A_heaving):
     if omega ==0 : A=0
@@ -89,120 +81,132 @@ def printParameters (Re,chord,airfoil,omega,A_heaving):
 
 
 
-def levenbergMarquardt (f,x0,g):
-   epsilon=1e-4
-   x=x0
-   n=f(x0).size
-   def j (x):
-       return g(f,x)
-   lam=np.trace(np.dot(j(x),np.transpose(j(x))))*1e-3/n
-   iter=0
-   maxIter=10000
-   while np.norm(f(x))>epsilon and iter<maxIter :
-       counter=0
-       accepted=False
-       while not accepted :
-           dx=-np.dot(np.dot(np.linalg.pinv(np.dot(np.transpose(j(x)),j(x))+lam*np.eye(n)),j(x).T),f(x))
-           if np.norm(f(x+dx))<np.norm(f(x)) :
-               x+=dx
-               lam=lam/10
-               aceepted=True
-           else :
-               lam*=10
-           counter+=1
-           if counter >100 :
-               return x
-   return x
+def json2Dict (jsonFile):
+    s=open(jsonFile,'r').read()
+    return json.loads(s)
 
-
-def newtonVect (f,x0,jac):
-    epsilon=1e-4
-    c=0
-    def j(x):
-        return jac(f,x)
-    maxIter=10000
-    while np.linalg.norm(f(x0))>epsilon and c<maxIter :
-        x0=np.linalg.solve(j(x0),-f(x0))+x0
-        print("x0 = ",x0)
-        c+=1
-    if c>=maxIter :
-        print ("In newton function, counter reached ",maxIter,". Best solution : x0 = ",x0,"    f(x0) = ",f(x0))
-    return x0
-
-
-def grad (f,x):
-    h=1e-6
-    g1=(f([x[0]+h,x[1]])-f(x))/h
-    g2=(f([x[0],x[1]+h])-f(x))/h
-    return [g1,g2]
-
-
-def polynome (x,coeffs):
-    y=0
-    for k in range(len(coeffs)):
-        y+=coeffs[k]*x**k
-    return y
-
-def interpolatedValue (x,l):
-    i1=0
-    i2=len(l)-1
-    while i2-i1 != 1:
-        m=(i2+i1)//2
-        if x < l[m,0]:
-            i2=m
-        else :
-            i1=m
-    x1=l[i1,0]
-    x2=l[i1+1,0]
-    y1=l[i1,1]
-    y2=l[i1+1,1]
-    return ( (x2-x)*y1 + (x-x1)*y2 ) / (x2-x1)
-
-
-def movingMean (l,p):
-    mm=[]
-    for i,v in enumerate(l):
-        if i<=p-1 :
-            mm.append(np.mean(l[:i+p+1]))
-        elif i>=len(l)-p:
-            mm.append(np.mean(l[i-p:]))
-        else :
-            mm.append(np.mean(l[i-p:i+p+1]))
-    return np.array(mm)
-
-def curParamsDict ():
-    paramsStr=open('current-params.json','r').read()
-    return json.loads(paramsStr)
-
-def dirPath (dir="",source="model",polar=0) :
-    curParams=curParamsDict()
+def dirPath (dir="",folder="",polar=0,comparison=False,create=False) :
+    curParams=json2Dict(CURRENTPARAMSJSON)
+    params=json2Dict(PARAMSJSON)
+    U=params["dim_quantities"]["U"]
+    chord=params["dim_quantities"]["chord"]
     if params["polarSource"] in ["exp","expe","experiment"]:
         polarSource="exp"
     else :
         polarSource=params["polarSource"]
-    path=dir+"/"*(dir!="" and dir[-1]!="/")+"NACA"+curParams["NACA"]+"_Re"+str(int(curParams["Re"]))+"_"+polarSource
-    if not os.path.isdir(path) :
+    path=dir+"/"*(dir!="" and dir[-1]!="/")+"NACA"+curParams["NACA"]+"_Re"+str(int(curParams["Re"]))+"_"+polarSource+comparison*"_comparison"
+    if create and not os.path.isdir(path) :
         os.mkdir(path)
     if polar:
         path+="/xfoil_polar"
-        if not os.path.isdir(path) :
+        if create and not os.path.isdir(path) :
             os.mkdir(path)
         return path
-    path+="/f"+("000"+str(int(curParams["omega"]*U/(2*np.pi*chord))))[-3:]+"_omega"+("000"+str(int(curParams["omega"]*100)))[-3:]+"_h"+("000"+str(int(curParams["A_heaving"]*100)))[-3:]+str(int(curParams["theta0"]))
-    if not os.path.isdir(path) :
-        os.mkdir(path)
-    path+="/"+source
-    if not os.path.isdir(path) :
-        os.mkdir(path)
+    f=("000"+str(int(curParams["omega"]*U/(2*np.pi*chord)*100)))[-3:]
+    path+="/f"+f+"_omega"+("000"+str(int(curParams["omega"]*100)))[-3:]+"_h"+("000"+str(int(curParams["A_heaving"]*100)))[-3:]+"_a"+str(int(curParams["theta0"]))
+    if create and not os.path.isdir(path) :
+        os.mkdir(path) 
+    path+="/f"+f+"_omega"+("000"+str(int(curParams["omega"]*100)))[-3:]+"_h"+("000"+str(int(curParams["A_heaving"]*100)))[-3:]+"_a"+str(int(curParams["theta0"]))+"_xA"+("000"+str(int(curParams["x_A"]*100)))[-3:]+"_phi"+str(int(curParams["phi"]))+"_pitch"+("000"+str(int(curParams["A_pitching"]*10)))[-3:]
+    if create and not os.path.isdir(path) :
+        os.mkdir(path) 
+    if folder!="" :
+        path+="/"+folder
+        if not os.path.isdir(path) : os.mkdir(path)
     return path
 
-def filePath (dir="",source="model") :
-    curParams=curParamsDict()
-    path=dirPath(dir,source)
-    path+="/f"+("000"+str(int(curParams["omega"]*U/(2*np.pi*chord))))[-3:]+"_omega"+("000"+str(int(curParams["omega"]*100)))[-3:]+"_h"+("000"+str(int(curParams["A_heaving"]*100)))[-3:]+"_a"+str(int(curParams["theta0"]))+"xA"+("000"+str(int(curParams["x_A"]*100)))[-3:]+"_phi"+str(int(curParams["phi"]))+"_pitch"+("000"+str(int(curParams["A_pitching"]*10)))[-3:]+".csv"
+def filePath (dir="",end="",ext=".csv",folder="",comparison=False,create=False) :
+    curParams=json2Dict(CURRENTPARAMSJSON)
+    params=json2Dict(PARAMSJSON)
+    U=params["dim_quantities"]["U"]
+    chord=params["dim_quantities"]["chord"]
+    path=dirPath(dir,folder=folder,comparison=comparison,create=create)
+    f=("000"+str(int(curParams["omega"]*U/(2*np.pi*chord)*100)))[-3:]
+    path+="/"+path.split("/")[-1]+end+ext
     return path
 
+def checkComparison (args):
+    return ("comparison" in args) or ("compare" in args) or ("comp" in args)
 
+def prettyPrint (dict):
+    s=" ____________________________________________________________________\n"
+    for key in dict :
+        if key!="dim_quantities":
+            s+='  '+key+(15-len(key))*' '
+            if type(dict[key])==type(''):
+                s+=dict[key]
+            elif len(dict[key])==1:
+                if type(dict[key])==type(0.0):
+                    s+=str(round(dict[key][0],4))
+                else :
+                    s+=str(dict[key][0])
+            else :
+                if type(dict[key][0])==type(0.0):
+                    s+=str(list(np.round(dict[key],2)))
+                else :
+                    s+=str(dict[key])
+            s+='\n'
+    s+=' ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾'
+    # s=s[:-1]
+    print(s)
+    
+
+def checkParamsFile ():
+    with open('params.py','r') as f :
+        content=f.readlines()
+        f.close()
+    # for line in ["import json","import numpy as np"]:
+    #     if line not in content :
+    #         content=[line]+content
+    # for line in ['parameters["dim_quantities"]={"U":U,"chord":chord,"span":span,"rho":rho,"S":S,"mu":mu}','with open("params.json","w") as jsonFile :','    json.dump(parameters,jsonFile,indent=2)']:
+    #     if line not in content :
+    #         content.append(line)
+    counter=0
+    for i,line in enumerate(content) :
+        if "np." in line and ":" in line and "list" not in line :
+            ind=line.index(":")
+            if "}" in content[i+1]:
+                line=line[:ind+1]+"list("+line[ind+1:-1]+")\n"
+            else :
+                line=line[:ind+1]+"list("+line[ind+1:-2]+"),\n"
+        if "polarSource" in line :
+            line=line[:line.index(':')]+line[line.index(':'):].split(',')[0]+',\n'
+            line=line.replace('[','')
+            line=line.replace(']','')
+        if counter!=0 :
+            counter+=1
+        if counter%2==1 and counter <20:
+            ind=line.index(":")
+            line=line[:ind]+' '*(30-len(line[:ind]))+line[ind:]
+        if "parameters" in line and "=" in line and "{" in line and '[' not in line:
+            counter=1
+        content[i]=line
+    with open('params.py','w') as f :
+        f.writelines(content)
+        f.close()
+
+
+class FuncThread (Thread):
+    def __init__(self, func,args):
+        Thread.__init__(self)
+        self.func=func
+        self.args=args
+
+    def run(self):
+        self.func(**self.args)
+
+def remainingTime (showTime):
+    for t in range(int(showTime),-1,-1):
+        sys.stdout.write("\r Remaining time before figure closing : {} seconds.".format(t))
+        sys.stdout.flush()
+        time.sleep(1)
+    print('\n')
+
+def is_int(string):
+    try :
+        int(string)
+        return True
+    except :
+        return False
 
 #### Propulsive Efficiency ################################
 def eta (T,Cxi,CxN,cp):

@@ -5,16 +5,16 @@ from airfoil import *
 from copy import deepcopy
 
 
-def computeCycle(args):
-    curParams=curParamsDict()
+def computeCycle(args=[]):
+    curParams=json2Dict(CURRENTPARAMSJSON)
     success=True
 
-    if 'compare' in args or 'comparison' in args :
-        if not os.path.isfile(filePath("data","exp")) :
-            print(filePath("data","exp")+"  doesn't exist.")
+    if checkComparison(args) :
+        if not os.path.isfile(filePath("data_exp")) :
+            print(filePath("data_exp")+"  doesn't exist.")
             success=False
         else :
-            df=pd.read_csv(filePath("data","exp"))
+            df=pd.read_csv(filePath("data_exp"))
 
             T1=df["t*1"].to_numpy()
             T2=df["t*2"].to_numpy()
@@ -38,27 +38,37 @@ def computeCycle(args):
             A_h,phi_h=opRes_h.x
             # print("A_p = ",A_p," phi_p = ",phi_p)
             # print("A_h = ",A_h," phi_h = ",phi_h)
-            curParams["A_pitching"],curParams["A_heaving"],curParams["phi"]=A_p,A_h,phi_p
+            curParams["A_pitching"],curParams["A_heaving"],curParams["phi"]=A_p,A_h,-phi_h
     else :
-        phi_h = 0
-        period=2*np.pi/curParams["omega"]
-        T1=np.linspace(period/2,0,50)
-        print(T1)
-        T2=np.linspace(period/2,period,50)
+        phi_p = 0
+        if curParams["omega"] > 0 :
+            period=2*np.pi/curParams["omega"]
+            T1=np.linspace(period/2,0,50)
+            T2=np.linspace(period/2,period,50)
+        elif curParams["omega"]==0:
+            T1=[0]
+            T2=[0]
+        else :
+            raise ("Error : omega can't be a negative number.")
 
     if success :
-        airfoil=Airfoil(curParams,phi_h=phi_h)
+        airfoil=Airfoil(curParams,phi_p=phi_p)
 
         m=len(T1)
         CzList,CxList,CmList=[],[],[]
-        for i,t in enumerate(np.concatenate([T1,T2])) :
+        T1T2=np.concatenate([T1,T2])
+        for i,t in enumerate(T1T2) :
+            airfoil.Cz(t)
+            airfoil.Cx(t)
+            airfoil.Cm(t)
             CzList.append(deepcopy(airfoil.Cz))
             CxList.append(deepcopy(airfoil.Cx))
             CmList.append(deepcopy(airfoil.Cm))
         # CzList=np.array(CzList).T
         # CxList=np.array(CxList).T
         # CmList=np.array(CmList).T
-        
+        # print(CzList[0:m][0].Cz)
+
         # Model
         dict_theo={'pitch_angle':[rad2deg(airfoil.theta(t).real) for t in T1],
                 't*1':T1,
@@ -76,28 +86,55 @@ def computeCycle(args):
                 'Cm1':[cm.Cm for cm in CmList[0:m]],
                 'Cm2':[cm.Cm for cm in CmList[m:]],}
         df_theo=pd.DataFrame(dict_theo)
-        df_theo.to_csv(filePath('data','model'), index=False)   # Writes the DataFrame of the model to a csv file
+        df_theo.to_csv(filePath('data',end="",ext=".csv",comparison=checkComparison(args),create=True), na_rep=" ", index=False)   # Writes the DataFrame of the model to a csv file
 
         # # Contributions
-        # dict_contrib={
-        #         'Cz_AM':
-        #         'Cz_VE':
-        #         'Cx_bonnet':
-        #         'Cx_steady':
-        # }
-        # df_contrib
+        dict_contrib={
+                'Cz_AM1':[cz.addedMassTerm for cz in CzList[0:m]],
+                'Cz_AM2':[cz.addedMassTerm for cz in CzList[m:]],
+                'Cz_VE1':[cz.vortexTerm for cz in CzList[0:m]],
+                'Cz_VE2':[cz.vortexTerm for cz in CzList[m:]],
+                'Cx_bonnet1':[cx.Cx_Bonnet for cx in CxList[0:m]],
+                'Cx_bonnet2':[cx.Cx_Bonnet for cx in CxList[m:]],
+                'Cx_steady1':[cx.steadyCxProj for cx in CxList[0:m]],
+                'Cx_steady2':[cx.steadyCxProj for cx in CxList[m:]],
+        }
+        df_contrib=pd.DataFrame(dict_contrib)
+        df_contrib.to_csv(filePath('data',end="_contrib",ext=".csv",comparison=checkComparison(args),create=True), index=False)
+
+        # Efficiency
+        dict_eff={
+                'Cx_mean':np.mean([cx.Cx for cx in CxList]),
+                'Cz_mean':np.mean([cz.Cz for cz in CzList]),
+                'Cm_mean':np.mean([cm.Cm for cm in CmList]),
+                'CPp_mean':np.mean([-CmList[i].Cm*airfoil.theta.d(T1T2[i]).real for i in range(len(CxList))]),
+                'CPh_mean':np.mean([-CzList[i].Cz*airfoil.h.d(T1T2[i]).real for i in range(len(CzList))]),
+        }
+        if curParams['A_pitching']==0 :
+            dict_eff['Eff_wg']=[0]
+        else :
+            path_np=filePath('data',comparison=checkComparison(args)).replace('pitch'+("000"+str(int(curParams["A_pitching"]*10)))[-3:],'pitch000')
+            if os.path.isfile(path_np) :
+                Cx_np=pd.read_csv(path_np)['Cx_mean'].to_numpy()[0]
+                dict_eff['Eff_wg']=[1-(dict_eff['Cx_mean']+dict_eff['CP_mean'])/Cx_np]
+            else :
+                print('Impossible to compute Eff_wg')
+                dict_eff['Eff_wg']=['None']
+        dict_eff['Eff_prop']= dict_eff['Cx_mean']/(dict_eff['CPp_mean']+dict_eff['CPh_mean'])
+        df_eff=pd.DataFrame(dict_eff)
+        df_eff.to_csv(filePath('data',end="_eff",ext=".csv",comparison=checkComparison(args),create=True), index=False)
 
 
-        # # Quasi-static
-        # dict_qs=dict_theo   # Copies the dictionnary of the model to create the dictionnary of the quasi-static theory
-        # dict_qs["Cx1"]=Cx_theo[1,0:m]   # Replaces the coefficient values with quasi-static values
-        # dict_qs["Cx2"]=Cx_theo[1,m:]
-        # dict_qs["Cz1"]=Cz_theo[1,0:m]
-        # dict_qs["Cz2"]=Cz_theo[1,m:]
-        # dict_qs["Cm1"]=Cm_theo[1,0:m]
-        # dict_qs["Cm2"]=Cm_theo[1,m:]
-        # df_qs=pd.DataFrame(dict_qs)     # Creates the quasi-static DataFrame from the dictionnary
-        # df_qs.to_csv(filePath('data/qs',pitch), index=False)    # Writes the quasi-static DataFrame to csv file
-        # airfoil=Airfoil(currentParams)
+
+        # Quasi-static
+        dict_qs=dict_theo   # Copies the dictionnary of the model to create the dictionnary of the quasi-static theory
+        dict_qs["Cx1"]=[cx.Cx_qs for cx in CxList[0:m]]   # Replaces the coefficient values with quasi-static values
+        dict_qs["Cx2"]=[cx.Cx_qs for cx in CxList[m:]]
+        dict_qs["Cz1"]=[cz.Cz_qs for cz in CzList[0:m]]
+        dict_qs["Cz2"]=[cz.Cz_qs for cz in CzList[m:]]
+        dict_qs["Cm1"]=[cm.Cm_qs for cm in CmList[0:m]]
+        dict_qs["Cm2"]=[cm.Cm_qs for cm in CmList[m:]]
+        df_qs=pd.DataFrame(dict_qs)     # Creates the quasi-static DataFrame from the dictionnary
+        df_qs.to_csv(filePath('data',end="_qs",ext=".csv",folder="quasi-static",comparison=checkComparison(args),create=True), index=False)    # Writes the quasi-static DataFrame to csv file
     return success
 

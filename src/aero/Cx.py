@@ -10,16 +10,17 @@ class Cx ():
 
     # Contributions
     Cx=0
-    CxBonnet=0
+    Cx_Bonnet=0
     steadyCxProj=0
-    addedMass=0
-    vortex=0
-    AMxV=0
+    addedMassTerm=0
+    vortexTerm=0
+    AMxVTerm=0
 
     # Quasi-static
     Cx_qs=0
 
     def __init__ (self,theta,h,Cz,CxPolar):
+        self.currentT=None
         self.theta=theta
         self.h=h
         self.Cz=Cz
@@ -35,25 +36,22 @@ class Cx ():
             return self.Cx_qs
 
     def computeCx (self,t):
-        Cz0=self.k_alpha*self.theta.theta0
-        Czi=self.Cz.getVortexTerm(t)
-        T1=-Cz0*self.theta.theta0+self.Cz.Cz_theod*self.theta(t).real
-        self.CxBonnet = T1+np.pi/2*self.theta.d(t).real*(-0.25*self.theta.d(t).real+2*self.theta.theta0)+Czi*(-2*self.theta.theta0+self.theta.d(t).real/2-Czi/self.Cz.k_alpha)
+        Cz0=self.Cz.k_alpha*self.theta.mean
+        Czi=self.Cz.vortexTerm
+        T1=-Cz0*self.theta.mean+self.Cz.Cz_theod*self.theta(t).real
+        self.Cx_Bonnet = T1+np.pi/2*self.theta.d(t).real*(-0.25*self.theta.d(t).real+2*self.theta.mean)+Czi*(-2*self.theta.mean+self.theta.d(t).real/2-Czi/self.Cz.k_alpha)
         alphaH=np.arctan(self.h.d(t).real)
         alpha=alphaH+self.theta(t).real
         self.steadyCxProj=self.steadyCx(alpha)*np.cos(alphaH)
-        self.Cx=self.CxBonnet+self.steadyCxProj
+        self.Cx=self.Cx_Bonnet+self.steadyCxProj
         steadyCzProj=-self.Cz.k_alpha*np.sin(alphaH)
         Cx_qs=steadyCzProj+self.steadyCxProj
 
     def steadyCx (self,alpha):
-        if type(self.CxPolar)==type([]) :
-            if type(self.CxPolar[0]) == type(0.0) :
-                return polynome(rad2deg(alpha),self.CxPolar)
-            elif type(self.CxPolar[0]) == type([]) :
-                return interpolatedValue(rad2deg(alpha),self.CxPolar)
+        if type(self.CxPolar[0]) == type(0.0) :
+            return polynome(rad2deg(alpha),self.CxPolar)
         else :
-            print("Error : Cx polar not defined. CxPolar is : ",self.CxPolar)
+            return interpolatedValue(rad2deg(alpha),self.CxPolar)
 
     def plotCxPolar (self):
         polarFig = plt.figure()

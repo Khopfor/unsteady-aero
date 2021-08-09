@@ -1,0 +1,2 @@
+run contrib
+set phi 90

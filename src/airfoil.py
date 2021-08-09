@@ -14,35 +14,42 @@ class Airfoil :
     polar=None
     # k_alpha=0.76*2*np.pi # =4.775
 
-    def __init__ (self,x_A=0.25,theta0=0,omega=0,A_pitching=0,A_heaving=0,phi=0,Re=130000,nacaDigits='0015',phi_h=0,polarSource="xfoil",x_A_polar=0.3):
+    def __init__ (self,x_A=0.25,theta0=0,omega=0,A_pitching=0,A_heaving=0,phi=0,Re=130000,nacaDigits='0015',phi_p=0,polarSource="xfoil",x_A_polar=0.3):
         self.x_A=x_A
-        self.theta=ExpFunc(deg2rad(A_pitching),omega,phi,theta0)
-        self.h=ExpFunc(A_heaving,omega,phi_h,0)
-        self.NACA_4Digits(int(nacaDigits), 1000)
+        self.theta=ExpFunc(deg2rad(A_pitching),omega,phi_p,theta0)
+        self.h=ExpFunc(A_heaving,omega,-phi,0)
+        self.airfoil=Airfoil.NACA_4Digits(int(nacaDigits), 1000)
         if polarSource == "xfoil" :
             x_A_polar=0.25
         else :
             x_A_polar=0.3
 
+
         # Aerodynamic coefficients
         self.Cz=Cz(self.theta,self.h,self.x_A,self.getPolar(polarSource,'Cz',nacaDigits,Re))
         self.Cx=Cx(self.theta,self.h,self.Cz,self.getPolar(polarSource,'Cx',nacaDigits,Re))
+        self.Cz.Cx=self.Cx
         self.Cm=Cm(self.theta,self.h,self.Cz,self.x_A,x_A_polar,self.getPolar(polarSource,'Cm',nacaDigits,Re))
 
-    def __init__ (self,params,phi_h=0):
+    def __init__ (self,params,phi_p=0):
         self.x_A=params["x_A"]
-        self.theta=ExpFunc(deg2rad(params["A_pitching"]),params["omega"],params["phi"],params["theta0"])
-        self.h=ExpFunc(params["A_heaving"],params["omega"],phi_h,0)
-        self.NACA_4Digits(int(params["NACA"]), 1000)
+        self.theta=ExpFunc(deg2rad(params["A_pitching"]),params["omega"],phi_p,deg2rad(params["theta0"]))
+        self.h=ExpFunc(params["A_heaving"],params["omega"],-params["phi"],0)
+        self.airfoil=Airfoil.NACA_4Digits(int(params["NACA"]), 1000)
         if params["polarSource"] == "xfoil" :
             x_A_polar=0.25
         else :
             x_A_polar=0.3
 
+        polarSource=params["polarSource"]
+        if polarSource in ["exp","experiment"] :
+            polarSource=glob.glob("data_exp/NACA"+params["NACA"]+"_Re"+str(params["Re"])+"_exp/*_omega000_h000_a0*/*_omega000_h000_a0*/*.csv")[0]
+
         # Aerodynamic coefficients
-        self.Cz=Cz(self.theta,self.h,self.x_A,self.getPolar(params["polarSource"],'Cz',params["NACA"],params['Re']))
-        self.Cx=Cx(self.theta,self.h,self.Cz,self.getPolar(params["polarSource"],'Cx',params["NACA"],params['Re']))
-        self.Cm=Cm(self.theta,self.h,self.Cz,self.x_A,x_A_polar,self.getPolar(params["polarSource"],'Cm',params["NACA"],params['Re']))
+        self.Cz=Cz(self.theta,self.h,self.x_A,self.getPolar(polarSource,'Cz',params["NACA"],params['Re']))
+        self.Cx=Cx(self.theta,self.h,self.Cz,self.getPolar(polarSource,'Cx',params["NACA"],params['Re']))
+        self.Cz.Cx=self.Cx
+        self.Cm=Cm(self.theta,self.h,self.Cz,self.x_A,x_A_polar,self.getPolar(polarSource,'Cm',params["NACA"],params['Re']))
 
 
     def alphaH (self,t):
@@ -74,7 +81,7 @@ class Airfoil :
         if type(polarSource)==type("") :
             if polarSource=="xfoil" :
                 if type(self.polar) == type(None) :
-                    polarName = dirPath("data",polar=1)+"/NACA"+nacaDigits+"_Re"+str(int(Re))+".pol"
+                    polarName = dirPath("data",polar=1,create=1)+"/NACA"+nacaDigits+"_Re"+str(int(Re))+".pol"
                     if not os.path.isfile(polarName) :
                         alphaMin=-15
                         alphaMax=15
@@ -88,6 +95,8 @@ class Airfoil :
                         instFile.close()
                         os.system("xfoil < inst.in\n") # Gives the instruction file to XFoil
                         print("\n")
+                        os.remove("inst.in")
+                        os.remove(":00.bl")
                     polarFile = open(polarName,'r')
                     self.polar = np.loadtxt(polarFile,skiprows=12)
                     polarFile.close()
@@ -96,7 +105,7 @@ class Airfoil :
                 elif coeff == 'Cx' :
                     return np.array([self.polar[:,0] , np.sum(self.polar[:,[2,3]],axis=1).T]).T
                 elif coeff == 'Cm' :
-                    return np.array([self.polar[:,0],self.polar[4]]).T
+                    return np.array([self.polar[:,0],self.polar[:,4]]).T
             else :
                 self.polar=pd.read_csv(polarSource)
                 THETA=self.polar["pitch_angle"].to_numpy()
@@ -104,7 +113,7 @@ class Airfoil :
                 if coeff == 'Cz' :
                     Cz1=self.polar["Cz1"].to_numpy()
                     Cz2=self.polar["Cz2"].to_numpy()
-                    CZ=np.array([[Cz1[k,0],max(Cz1[k,1],Cz2[k,1],key=abs)] for k in range(len(Cz1))])
+                    CZ=np.array([max(Cz1[k],Cz2[k],key=abs) for k in range(len(Cz1))])
                     return np.array([THETA,CZ]).T
                 elif coeff == 'Cx' :
                     MMCX=movingMean(np.minimum(self.polar["Cx1"].to_numpy(),self.polar["Cx2"].to_numpy()),n//30)
@@ -112,6 +121,10 @@ class Airfoil :
                 elif coeff == 'Cm' :
                     MMCM=movingMean(np.minimum(self.polar["Cm1"].to_numpy(),self.polar["Cm2"].to_numpy()),n//50)
                     return np.array([THETA,MMCM]).T
+        elif type(polarSource)==type([]) :
+            print("Error : Polar source parameter is a list.")
+        else :
+            print("Error : Polar source not valid. Type ",type(polarSource), " instead of type string.")
 
 
     # def getCxPolar (self,nacaDigits,Re):
@@ -165,7 +178,8 @@ class Airfoil :
     #     else :
     #         print("Cx polar format not valid.")
         
-    def NACA_4Digits (self,digits,N):
+    def NACA_4Digits (digits,N) :
+        digits=int(digits)
         p,m,e=digits//1000/10,(digits%1000)//100/100,digits%100/100
         X=np.linspace(0,1,N)
         y_t=5*e*(0.2969*np.sqrt(X)-0.1260*X-0.3516*X**2+0.2843*X**3-0.1015*X**4)
@@ -184,7 +198,7 @@ class Airfoil :
             theta,y_c=np.array(theta),np.array(y_c)
             X_U=X-y_t*np.sin(theta),X+y_t*np.sin(theta)
             y_U,y_L=y_c+y_t*np.cos(theta),y_c-y_t*np.cos(theta)
-        self.airfoil=np.array([np.concatenate((-X,np.flip(-X))),np.concatenate((y_U,np.flip(y_L)))])
+        return np.array([np.concatenate((-X,np.flip(-X))),np.concatenate((y_U,np.flip(y_L)))])
 
 # airfoil=Airfoil()
 # profile=np.array([airfoil.airfoil[0]+0.3,airfoil.airfoil[1]])

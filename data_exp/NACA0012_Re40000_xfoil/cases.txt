@@ -1,0 +1,33 @@
+Case 1 : h*=0.75 alpha_max = 21° phi=75°
+Case 2 : h*=0.75 alpha_max = 17° phi=105°
+Case 3 : h*=0.25 alpha_max = 15° phi=90°
+Case 4 : h*=0.75 alpha_max = 5° phi=90°
+Case 5 : h*=0.75 alpha_max = 25° phi=90°
+Case 6 : h*=0.75 alpha_max = 20° phi=90°
+Case 7 : h*=0.75 alpha_max = 10° phi=90° ***
+Case 8 : h*=0.75 alpha_max = 30° phi=90°
+
+
+Strouhal numbers for Case 7, frequency, reduced pulsation
+0.08
+0.09
+0.10
+0.11
+0.13
+0.14
+0.155
+0.17
+0.205
+0.24
+0.28
+0.31
+0.32
+0.355
+0.4
+0.42
+0.455
+0.475
+0.51
+
+
+

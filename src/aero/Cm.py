@@ -32,8 +32,8 @@ class Cm ():
             return self.Cm_qs
 
     def computeCm (self,t):
-        self.Cm0=self.getCmA_polar(self.theta.theta0)
-        self.addedMassTerm = np.pi/2*((1/2-self.x_A)*-self.h.dd(t)+(3/4-self.x_A)*self.theta.d(t)+(9/32-self.x_A+self.x_A**2)*self.theta.dd(t))
+        self.Cm0=self.getCmA_polar(self.theta.mean)
+        self.addedMassTerm = np.pi/2*((1/2-self.x_A)*-self.h.dd(t).real+(3/4-self.x_A)*self.theta.d(t).real+(9/32-self.x_A+self.x_A**2)*self.theta.dd(t).real)
         self.vortexTerm = (1/4-self.x_A)*self.Cz.vortexTerm
         self.Cm=self.Cm0+self.addedMassTerm+self.vortexTerm
         alphaH=np.arctan(self.h.d(t).real)
@@ -42,14 +42,10 @@ class Cm ():
         
 
     def getCmA_polar (self,alpha):
-        if type(self.CmPolar)==type([]) :
-            if type(self.CmPolar[0]) == type(0.0) :
-                self.CmA=polynome(rad2deg(alpha),self.CmPolarSource)
-            elif type(self.CmPolar[0]) == type([]) :
-                self.CmA=interpolatedValue(rad2deg(alpha),self.CmPolar)
+        if type(self.CmPolar[0]) == type(0.0) :
+            self.CmA=polynome(rad2deg(alpha),self.CmPolarSource)
         else :
-            self.CmA=0
-            print("Error : Cm polar not defined. CmPolar is : ",self.CmPolar)
+            self.CmA=interpolatedValue(rad2deg(alpha),self.CmPolar)
         return self.CmA+(self.x_A-self.x_A_polar)*self.Cz.Cz0
 
 
