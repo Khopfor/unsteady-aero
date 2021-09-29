@@ -1,12 +1,11 @@
 import sys
-sys.path.append('./src/')
-sys.path.append('./src/aero')
-from util import *
-from aero import *
-from expFunc import *
-from Cz import *
-from Cm import *
-from Cx import *
+import glob
+from src.util.util import *
+# from aero import *
+from src.util.expFunc import *
+from src.aero.Cz import *
+from src.aero.Cm import *
+from src.aero.Cx import *
 
 class Airfoil :
     airfoil=[]
@@ -18,7 +17,7 @@ class Airfoil :
         self.x_A=x_A
         self.theta=ExpFunc(deg2rad(A_pitching),omega,phi_p,theta0)
         self.h=ExpFunc(A_heaving,omega,-phi,0)
-        self.airfoil=Airfoil.NACA_4Digits(int(nacaDigits), 1000)
+        self.airfoil=Airfoil.NACA_4Digits(int(nacaDigits), 200)
         if polarSource == "xfoil" :
             x_A_polar=0.25
         else :
@@ -34,8 +33,8 @@ class Airfoil :
     def __init__ (self,params,phi_p=0):
         self.x_A=params["x_A"]
         self.theta=ExpFunc(deg2rad(params["A_pitching"]),params["omega"],phi_p,deg2rad(params["theta0"]))
-        self.h=ExpFunc(params["A_heaving"],params["omega"],-params["phi"],0)
-        self.airfoil=Airfoil.NACA_4Digits(int(params["NACA"]), 1000)
+        self.h=ExpFunc(params["A_heaving"],params["omega"],-deg2rad(params["phi"]),0)
+        self.airfoil=Airfoil.NACA_4Digits(int(params["NACA"]), 200)
         if params["polarSource"] == "xfoil" :
             x_A_polar=0.25
         else :
@@ -43,7 +42,12 @@ class Airfoil :
 
         polarSource=params["polarSource"]
         if polarSource in ["exp","experiment"] :
-            polarSource=glob.glob("data_exp/NACA"+params["NACA"]+"_Re"+str(params["Re"])+"_exp/*_omega000_h000_a0*/*_omega000_h000_a0*/*.csv")[0]
+            s="data_exp/NACA"+params["NACA"]+"_Re"+str(params["Re"])+"_exp/*_omega000_h000_a0*/*_omega000_h000_a0*/*.csv"
+            l=glob.glob(s)
+            if len(l)==0 :
+                print("Error : experimental polar file not found at ",s)
+            else :
+                polarSource=l[0]
 
         # Aerodynamic coefficients
         self.Cz=Cz(self.theta,self.h,self.x_A,self.getPolar(polarSource,'Cz',params["NACA"],params['Re']))
@@ -85,7 +89,7 @@ class Airfoil :
                     if not os.path.isfile(polarName) :
                         alphaMin=-15
                         alphaMax=15
-                        alphaStep = (alphaMax-alphaMin)/150
+                        alphaStep = (alphaMax-alphaMin)/100
                         instFile = open("inst.in",'w') # Creates the file containing the instructions
                         instFile.write("naca"+nacaDigits+"\noper\n") # Chooses the airfoil and enters the 'OPER' mode
                         instFile.write("visc\n"+str(Re)+"\n") # Toggles viscid mode and inputs the Reynolds number

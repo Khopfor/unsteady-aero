@@ -1,6 +1,4 @@
-import sys
-sys.path.append('./src')
-from util import *
+from src.util.util import *
 
 class Cm ():
     currentT=None
@@ -36,7 +34,7 @@ class Cm ():
         self.addedMassTerm = np.pi/2*((1/2-self.x_A)*-self.h.dd(t).real+(3/4-self.x_A)*self.theta.d(t).real+(9/32-self.x_A+self.x_A**2)*self.theta.dd(t).real)
         self.vortexTerm = (1/4-self.x_A)*self.Cz.vortexTerm
         self.Cm=self.Cm0+self.addedMassTerm+self.vortexTerm
-        alphaH=np.arctan(self.h.d(t).real)
+        alphaH=-np.arctan(self.h.d(t).real)
         alpha=alphaH+self.theta(t).real
         self.Cm_qs=self.getCmA_polar(alpha)
         

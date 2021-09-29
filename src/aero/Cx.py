@@ -1,8 +1,6 @@
-import os
-import sys
 import numpy as np
-sys.path.append('./src')
-from util import *
+from src.util.util import *
+from src.aero.Cz import Cz
 
 class Cx ():
     current=None
@@ -30,8 +28,10 @@ class Cx ():
         if self.currentT != t :
             self.computeCx(t)
             self.currentT=t
-        if model in ["theodorsen","theod"] :
+        if model in ["theodorsen","theod","tg"] :
             return self.Cx
+        elif model in ["rev"]:
+            return self.Cx_rev
         elif model in ["qs","quasistatic","quasi-static"]:
             return self.Cx_qs
 
@@ -39,13 +39,16 @@ class Cx ():
         Cz0=self.Cz.k_alpha*self.theta.mean
         Czi=self.Cz.vortexTerm
         T1=-Cz0*self.theta.mean+self.Cz.Cz_theod*self.theta(t).real
-        self.Cx_Bonnet = T1+np.pi/2*self.theta.d(t).real*(-0.25*self.theta.d(t).real+2*self.theta.mean)+Czi*(-2*self.theta.mean+self.theta.d(t).real/2-Czi/self.Cz.k_alpha)
-        alphaH=np.arctan(self.h.d(t).real)
+        T2=np.pi/2*self.theta.d(t).real*(-0.25*self.theta.d(t).real+2*self.theta.mean)
+        self.Cx_Bonnet = T1+T2+Czi*(-2*self.theta.mean+self.theta.d(t).real/2-Czi/self.Cz.k_alpha)
+        self.Cx_tilde_rev=T1+T2+self.Cz.k_alpha*(self.theta(t).real-self.theta.mean-self.h.d(t).real+(3/4-self.Cz.x_A)*self.theta.d(t).real)*(np.pi/(2*self.Cz.k_alpha)*self.theta.d(t).real+(2*1j/np.pi*Cx.C1Func(self.theta.omega/2)*(self.h.d(t)-2*self.theta(t)+(self.Cz.x_A-1)*self.theta.d(t))+Cz.theodFunc(self.theta.omega/2)*(self.theta(t)-self.theta.mean)).real)
+        alphaH=-np.arctan(self.h.d(t).real)
         alpha=alphaH+self.theta(t).real
         self.steadyCxProj=self.steadyCx(alpha)*np.cos(alphaH)
         self.Cx=self.Cx_Bonnet+self.steadyCxProj
-        steadyCzProj=-self.Cz.k_alpha*np.sin(alphaH)
-        Cx_qs=steadyCzProj+self.steadyCxProj
+        self.Cx_rev=self.Cx_tilde_rev+self.steadyCxProj
+        steadyCzProj=-self.Cz.k_alpha*alpha*np.sin(alphaH)
+        self.Cx_qs=steadyCzProj+self.steadyCxProj
 
     def steadyCx (self,alpha):
         if type(self.CxPolar[0]) == type(0.0) :
@@ -66,3 +69,8 @@ class Cx ():
         plt.legend()
         plt.grid()
         plt.show()
+
+    def C1Func (k):
+        H0= hankel2(0,k)
+        H1= hankel2(1,k)
+        return 1/k*np.exp(-1j*k)/(H1+1j*H0)

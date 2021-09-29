@@ -5,6 +5,8 @@ from glob import glob
 
 from pandas.io.parsers import read_csv
 from airfoil import *
+import sys
+sys.path.append('./src/util')
 from util import *
 
 #### Flight parameters ###############################

@@ -1,7 +1,5 @@
-import sys
-sys.path.append('./src')
 from scipy.special import hankel2
-from util import *
+from src.util.util import *
 
 ### Lift coefficient class ###
 # This class computes the lift coefficient and its contributions
@@ -35,16 +33,18 @@ class Cz ():
             self.currentT=t
         if model in ["theodorsen","theod"] :
             return self.Cz
-        elif model in ["qs","quasistatic","quasi-static"]:
+        elif model in ["qs","quasistatic","quasi-static"] :
             return self.Cz_qs
 
     def computeCz (self,t):
         k=self.theta.omega/2
-        C=self.theodFunc(k)
+        C=Cz.theodFunc(k)
+
         self.Cz0=self.k_alpha*self.theta.mean
         self.addedMassTerm = np.pi/2*(-self.h.dd(t).real+self.theta.d(t).real+(1/2-self.x_A)*self.theta.dd(t).real)
         self.vortexTerm = (self.k_alpha*(self.theta(t)-self.theta.mean-self.h.d(t)+(3/4-self.x_A)*self.theta.d(t))*C).real
-        alphaH=np.arctan(self.h.d(t).real)
+
+        alphaH=-np.arctan(self.h.d(t).real)
         alpha=alphaH+self.theta(t).real
         self.steadyCxProj=self.Cx.steadyCx(alpha)*np.sin(alphaH)
         self.Cz_theod=self.Cz0+self.addedMassTerm+self.vortexTerm
@@ -54,12 +54,18 @@ class Cz ():
     def getKAlpha (self):
         i1,i2=1,0
         alphaLim=10
-        while self.CzPolar[i1,0]<-alphaLim or self.CzPolar[i1-1,0]>-alphaLim : i1+=1
-        while self.CzPolar[i2,0]>alphaLim or self.CzPolar[i2+1,0]<alphaLim : i2+=1
+        try :
+            while self.CzPolar[i1,0]<-alphaLim or self.CzPolar[i1-1,0]>-alphaLim : i1+=1
+            while self.CzPolar[i2,0]>alphaLim or self.CzPolar[i2+1,0]<alphaLim : i2+=1
+        except :
+            alphaLim=8
+            i1,i2=1,0
+            while self.CzPolar[i1,0]<-alphaLim or self.CzPolar[i1-1,0]>-alphaLim : i1+=1
+            while self.CzPolar[i2,0]>alphaLim or self.CzPolar[i2+1,0]<alphaLim : i2+=1
         # print(self.CzPolar[i1:i2+1,0])
         self.k_alpha=rad2deg(np.polyfit(self.CzPolar[i1:i2+1,0],self.CzPolar[i1:i2+1,1],1)[0])
 
-    def theodFunc (self,k):
+    def theodFunc (k):
         if k==0 :
             return 1
         else :
@@ -69,7 +75,7 @@ class Cz ():
 
     def plotTheodFunc (self,show=True,file=False):
         K=np.linspace(0,3,300)
-        C=[self.theodFunc(k) for k in K]
+        C=[Cz.theodFunc(k) for k in K]
         Re=[c.real for c in C]
         Im=[c.imag for c in C]
         if file :

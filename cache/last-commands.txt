@@ -1,2 +1,20 @@
-run contrib
-set phi 90
+plot eff show
+plot show comp
+set A_pitching np.linspace(0,10,11)
+set theta0 -3
+plot show comp
+plot show comp
+plot show comp
+set omega 0.3
+plot comp show
+plot comp show
+plot comp show 30
+plot show eff
+plot show eff
+set theta0 3
+set NACA "0015"
+set NACA "0012"
+set A_pitching 10
+set A_pitching 8
+set omega 0.7
+set omega 1
