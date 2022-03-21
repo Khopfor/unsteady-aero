@@ -21,7 +21,7 @@ def runAnimation ():
         period=6
         frequency=1/period
     df=pd.read_csv(filePath("data",folder="BF"))
-    df_eff=pd.read_csv(filePath("data",end="_eff"))
+    df_eff=pd.read_csv(filePath("data",folder="BF",end="_eff"))
     theta=df2numpy(df,["pitch_angle","pitch_angle"],[1,0])
     h=df2numpy(df,["h*1","h*2"],[1,0])
     alpha=df2numpy(df,["alpha1","alpha2"],[1,0])
@@ -44,7 +44,7 @@ def runAnimation ():
     prettyPrint(curParams)
     print("\n----- Dimensionless values ------------------------------")
     print("  Strouhal number = ",round(curParams["omega"]*curParams["A_heaving"]/np.pi,4))
-    print("  Feathering parameter = ")
+    print("  Feathering parameter = ",round(deg2rad(curParams["A_pitching"])/np.arctan(curParams["A_heaving"]*curParams["omega"]/params["dim_quantities"]["U"]),4))
     print("  A_Vh* = ",curParams["A_heaving"]*curParams["omega"])
     A_alphaH=round(np.arctan(curParams["A_heaving"]*curParams["omega"]),2)
     print("  A_alphah = ",A_alphaH, "rad = ",rad2deg(A_alphaH),"deg")
@@ -119,6 +119,7 @@ def runAnimation ():
         O_F=np.array([(x_Fa[frame]+curParams["x_A"])*np.cos(deg2rad(theta[frame])),(x_Fa[frame]+curParams["x_A"])*np.sin(deg2rad(theta[frame]))])
         # O_F=np.dot(rotY(deg2rad(theta[frame])),O_F)
         O_F[1]+=h[frame]
+        O_F[0]=max(min(curParams["x_A"],O_F[0]),curParams["x_A"]-1)
         forces.set_offsets([O_F,O_F,O_F])
         forces.set_UVC([0,-Cx[frame],-Cx[frame]],[Cz[frame],0,Cz[frame]])
         # print(time.time()-t)

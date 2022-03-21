@@ -1,4 +1,6 @@
 import os
+import json
+import numpy as np
 from src.util.var import *
 
 def json2Dict (jsonFile):

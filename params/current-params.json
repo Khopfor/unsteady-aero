@@ -1,11 +1,11 @@
 {
   "NACA": "0015",
   "Re": 135743,
-  "omega": 0.2091044070229366,
-  "A_heaving": 0.25,
-  "theta0": -3.0,
+  "polarSource": "xfoil",
+  "omega": 0.01,
+  "A_heaving": 0.5,
+  "theta0": 0,
   "x_A": 0.3,
-  "phi": -90.0,
-  "A_pitching": 10.0,
-  "polarSource": "exp"
+  "phi": 90,
+  "A_pitching": 6
 }

@@ -1,5 +1,6 @@
 from src.util.util import *
 from src.airfoil import *
+from src.efficiency import *
 from copy import deepcopy
 
 
@@ -100,7 +101,7 @@ def computeCycle(args=[]):
             else :
                 # print('Impossible to compute Eff_wg')
                 dict_eff['Eff_wg']=['None']
-        dict_eff['Eff_prop']= -dict_eff['Cx_mean']/(dict_eff['CPp_mean']+dict_eff['CPh_mean'])
+        dict_eff['Eff_prop']= effProp(dict_eff['Cx_mean'],dict_eff['CPh_mean'],dict_eff['CPh_mean'])    
         df_eff=pd.DataFrame(dict_eff)
         df_eff.to_csv(filePath('data',end="_eff",ext=".csv",folder="BF",comparison=checkComparison(args),create=True), index=False)
 
@@ -134,19 +135,27 @@ def computeCycle(args=[]):
         
 
         # Wind gusts efficiency
-        path_np=filePath('data',comparison=checkComparison(args),end='_eff').replace('pitch'+("000"+str(int(curParams["A_pitching"]*10)))[-3:],'pitch000')
+        ## BF
+        path_np=jokerReplace(filePath('tmp',comparison=checkComparison(args),end='_eff_BF'),'pitch',3,'pitch000')
         if os.path.isfile(path_np) :
             Cx_np=pd.read_csv(path_np)['Cx_mean'].to_numpy()[0]
             eff_wg_BF=1-(Cx_mean_BF+CPp_mean)/Cx_np
-            eff_wg_REV=1-(Cx_mean_REV+CPp_mean)/Cx_np
         else :
             eff_wg_BF=None
+
+        ## REV
+        path_np=jokerReplace(filePath('tmp',comparison=checkComparison(args),end='_eff_REV'),'pitch',3,'pitch000')
+        if os.path.isfile(path_np) :
+            Cx_np=pd.read_csv(path_np)['Cx_mean'].to_numpy()[0]
+            eff_wg_REV=1-(Cx_mean_REV+CPp_mean)/Cx_np
+        else:
             eff_wg_REV=None
+            # print("\n",path_np,"\n")
 
 
         # Propulsion efficiency
-        eff_prop_BF= Cx_mean_BF/(CPp_mean+CPh_mean)
-        eff_prop_REV= Cx_mean_REV/(CPp_mean+CPh_mean)
+        eff_prop_BF= effProp(Cx_mean_BF,CPh_mean,CPp_mean)
+        eff_prop_REV= effProp(Cx_mean_REV,CPh_mean,CPp_mean)
 
         dict_eff_BF={
             "Cx_mean":Cx_mean_BF,
@@ -154,7 +163,7 @@ def computeCycle(args=[]):
             "Eff_wg":eff_wg_BF,
         }
         df_eff_BF=pd.DataFrame(dict_eff_BF,index=[0])
-        df_eff_BF.to_csv(filePath('tmp',end='_eff_BF',create=True),index=False)
+        df_eff_BF.to_csv(filePath('tmp',end='_eff_BF',comparison=checkComparison(args),create=True),index=False)
 
         dict_eff_REV={
             "Cx_mean":Cx_mean_REV,
@@ -162,7 +171,7 @@ def computeCycle(args=[]):
             "Eff_wg":eff_wg_REV,
         }
         df_eff_REV=pd.DataFrame(dict_eff_REV,index=[0])
-        df_eff_REV.to_csv(filePath('tmp',end='_eff_REV',create=True),index=False)
+        df_eff_REV.to_csv(filePath('tmp',end='_eff_REV',comparison=checkComparison(args),create=True),index=False)
 
 
     # return success

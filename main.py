@@ -19,6 +19,7 @@ import json
 
 exit=False
 params={}
+curModels=json2Dict(CURRENTMODELS)
 
 def updateParams ():
     global params
@@ -33,23 +34,38 @@ print("=====================================================================")
 
 def printHelp ():
     print("\nCOMMANDS\n")
-    print("    exit OR quit               Exit program")
-    print("    edit                       Open the parameters python file to edit them")
-    print("    set <parameter> <value>    Set the specified parameter")
-    print("    param                      Show current parameters namely parameters file content")
-    print("    exp                        Show available experimental results for comparison")
-    print("    plot <options>             Plot graphs. Options for plotting are the following. No option only plots cycle data")
-    print("        show <seconds>             Show graphs. The time in seconds before which figures close themselves can be specified")
-    print("        save                       Save graphs as images")
-    print("        cycle                      Plot cycle data")
-    print("        comparison                 Compute comparison between model and experiment and plot it")
-    print("        contrib                    Plot contributions")
-    print("        eff                        Plot efficiency and mean drag")
-    print("    anim                       Show animation")
-    print("    optimize                   Enter optimizing mode. Optimize the parameters of your choice with respect to mean drag or efficiency.")
-    print("    clean                      Delete all data, images and videos")
-    print("    help                       Show this help")
+    print("    exit OR quit                   Exit program")
+    print("    edit                           Open the parameters python file to edit them")
+    print("    set <parameter> <value>        Set the specified parameter")
+    print("    param                          Show current parameters namely parameters file content")
+    print("    model <option>                 Show main model and second model in use.")
+    print("        set [main|second] <model>       Choose main or second model.")
+    print("    exp                            Show available experimental results for comparison")
+    print("    plot <options>                 Plot graphs. Options for plotting are the following. No option only plots cycle data")
+    print("        show <seconds>                  Show graphs. The time in seconds before which figures close themselves can be specified")
+    print("        save                            Save graphs as images")
+    print("        cycle                           Plot cycle data")
+    print("        comparison                      Compute comparison between model and experiment and plot it")
+    print("        contrib                         Plot contributions")
+    print("        eff                             Plot efficiency and mean drag")
+    print("    anim                           Show animation")
+    print("    optimize                       Enter optimizing mode. Optimize the parameters of your choice with respect to mean drag or efficiency.")
+    print("    clean                          Delete all data, images and videos")
+    print("    help                           Show this help")
     print()
+
+
+def printModels():
+    global curModels
+    curModels=json2Dict(CURRENTMODELS)
+    with open(AVAILABLEMODELS,'r') as f :
+        avModels=f.read().replace(" ",'').replace("\n"," | ")
+        f.close()
+    print("\nMODELS")
+    print("  Current main model : ",curModels["main"])
+    print("  Current second model : ",curModels["second"])
+    print("  -------------------------------------------")
+    print("  Available models : ",avModels,"\n")
 
 def printParam():
     print("\nPARAMETERS")
@@ -61,6 +77,7 @@ def printParam():
 
 updateParams()
 printHelp()
+printModels()
 printParam()
 
 autocmd=False
@@ -94,7 +111,7 @@ while not exit :
         printParam()
 
     # Set command
-    elif "set" in cmd:
+    elif "set" in cmd and "model" not in cmd :
         cmdList=cmd.split(' ')
         if len(cmdList)==1:
             cmdList.append(input("Enter a parameter : "))
@@ -107,16 +124,24 @@ while not exit :
         elif len(cmdList)==3:
             v=cmdList[2]
             keep=True
-        if 'np.' not in v and 'range' not in v and '[' and v not in ']' and ',' not in v:
-            v='['+v+']'
-        if 'np.' in v :
-            v="list("+v+")"
+        if p!="fluid":
+            if 'np.' not in v and 'range' not in v and '[' and v not in ']' and ',' not in v:
+                v='['+v+']'
+            if 'np.' in v :
+                v="list("+v+")"
         with open(PARAMSFILE,'r') as f :
             lines=f.readlines()
             f.close()
         with open(PARAMSFILE,'w') as f :
             for i,line in enumerate(lines):
-                if '"'+p+'"' in line:
+                if p=="fluid" :
+                    if v=="air":
+                        if "rho=" in line : line=changeValue(line,"rho","1.225")
+                        if "mu=" in line : line=changeValue(line,"mu","1.81e-5")
+                    if v=="water" :
+                        if "rho=" in line : line=changeValue(line,"rho","1000")
+                        if "mu=" in line : line=changeValue(line,"mu","1.00e-3")
+                elif '"'+p+'"' in line:
                     line="    "+'"'+p+'"'+":"+str(v)
                     if p!="A_pitching":
                         line+=","
@@ -129,6 +154,36 @@ while not exit :
     # Parameters command
     elif cmd in ["param","params"]:
         printParam()
+
+    # Choose model
+    elif "model" in cmd :
+        cmd=cmd.split(' ')
+        which="main"
+        if len(cmd)==1 :
+            printModels()
+        else :
+            if len(cmd)==2 and cmd[1]=="set":
+                which=input("Which model do you want to change ? (main/second) : ")
+                model=input("Enter new "+which+" model : ")
+            elif len(cmd)==3:
+                if cmd[1:]==["set","main"]:
+                    which="main"
+                elif cmd[1:]==["set","second"]:
+                    which=="second"
+                model=input("Enter new "+which+" model : ")
+            elif len(cmd)==4 and cmd[1]=="set":
+                if cmd[2] in ["main","second"]:
+                    which=cmd[2]
+                    model=cmd[3]
+            with open(AVAILABLEMODELS,'r') as f :
+                model=model.upper().replace(" ",'')
+                if model in f.read() :
+                    curModels[which]=model
+                    json.dump(curModels,open(CURRENTMODELS,'w'),indent=2)
+                    print(which[0].upper()+which[1:].lower()+" model is now : ",model)
+                else :
+                    print("Invalid model : ",model,". Try again.")
+                f.close()
 
     # Exp command
     elif cmd in ["exp"]:
@@ -213,8 +268,6 @@ while not exit :
                         plotComparison(save=("save" in argv),showTime=showTime)
                     if 'contrib' in argv :
                         plotContrib(save=("save" in argv),showTime=showTime,comp=checkComparison(argv))
-                    if "eff" in argv and eff:
-                        plotEff(absData,save=("save" in argv),showTime=showTime,comp=checkComparison(argv))
                 else :
                     paramLabel=list(params)[i]
                     if paramLabel in absData :
@@ -227,6 +280,8 @@ while not exit :
                             rec(i+1,{**currentParams,paramLabel:v})
 
             rec(0,{})
+            if 'eff' in argv :
+                plotEff(absData,save=("save" in argv),showTime=showTime,comp=checkComparison(argv))
 
         # for naca in params['NACA']:
         #     for Re in params['Re']:
@@ -320,5 +375,5 @@ while not exit :
         f.writelines(lines)
         f.close()
 
-# for f in glob.glob("tmp/*"):
-#     os.remove(f)
+    for f in glob.glob("tmp/*"):
+        shutil.rmtree(f)

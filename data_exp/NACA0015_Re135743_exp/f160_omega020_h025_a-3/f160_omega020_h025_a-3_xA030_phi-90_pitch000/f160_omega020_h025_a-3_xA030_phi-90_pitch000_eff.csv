@@ -1,2 +1,2 @@
-Sref,CXmoy,CZmoy,CMmoy,CPowerXmoy,CPowerMmoy,Eff
-0.164,0.010388,-0.277522,0.012403,0.010389,-1e-06,0
+Sref,Cx_mean,Cz_mean,Cm_mean,CPx_mean,CPp_mean,Eff_wg,CPh_mean,Eff_prop
+0.164,0.010388,-0.277522,0.012403,0.010389,-1e-06,0,0.0071031228434344,-1.46266126748332

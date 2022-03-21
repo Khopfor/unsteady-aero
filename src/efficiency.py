@@ -59,6 +59,13 @@ def meanCmdtheta (NACA,polarSource,Re,theta0,x_A,omega,A_heaving,phi,A_pitching,
     Ap2Term=k_alpha/2*A_pitching**2*omega*(np.pi/(2*k_alpha)*omega*(x_A-3/4)+G*(x_A-1/4)-F*omega*(x_A**2-x_A+3/16))
     return ApVzTerm+Ap2Term
 
+
+def effProp (Cx_mean,CPh_mean,CPp_mean):
+    CP_mean=max(0,CPh_mean)+max(0,CPp_mean)
+    if CP_mean==0:
+        return np.nan
+    return -Cx_mean/CP_mean
+
 # def eff (curParams,model="TG",type="prop"):
 #     if type=="prop":
 #         if model in ["TG","rev"]:

@@ -2,6 +2,7 @@ import os.path
 import sys
 import time
 import json
+import glob
 import matplotlib.pyplot as plt
 from scipy.special import hankel2
 from scipy import optimize
@@ -10,6 +11,7 @@ from threading import Thread
 from copy import deepcopy
 from src.util.pathMaker import *
 from src.util.maths import *
+from src.util.colors import *
 
 def writeList (filePath,l):
     file=open(filePath,'w')
@@ -217,6 +219,25 @@ def ajustCurParams(curParams):
     A_h,phi_h=opRes_h.x
     curParams["A_pitching"],curParams["A_heaving"],curParams["phi"]=A_p,A_h,-rad2deg(phi_h)
     return curParams,phi_p
+
+
+def changeValue (line,var,newValue):
+    index=0
+    if "#" in line :
+        index=line.index('#')
+    newLine=var+'='+newValue
+    if index :
+        newLine+=' '+line[index:]
+    return newLine
+
+
+def jokerReplace (string,sub,nbJokerChar,newSub):
+    index=string.find(sub)
+    if index==-1 :
+        print("Error: substring not in string.")
+    else :
+        return string.replace(string[index:index+len(sub)+nbJokerChar],newSub)
+
 
 
 
