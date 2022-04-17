@@ -1,3 +1,6 @@
+set polarSource 'exp'
+set polarSource exp
+set polarSource 'exp'
 set omega np.linspace(0.01,2,100)
 plot eff show*
 plot eff show*
@@ -15,6 +18,3 @@ plot eff show
 set omega np.linspace(0.05,5,100)
 plot eff show
 plot eff show
-set omega np.linspace(0.001,10,100)
-set omega np.linspace(0,10,100)
-set polarSource "xfoil"

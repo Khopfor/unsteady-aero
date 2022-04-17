@@ -34,7 +34,7 @@ parameters = {
     # Reynold number                                        
     "Re"                      :[135743],
     # Source for the polars
-    "polarSource"             :"xfoil",
+    "polarSource"             :'exp',
     # Reduced pulsation
     "omega"                   :list(np.linspace(0.01,2,100)),
     # Reduced heaving amplitude
