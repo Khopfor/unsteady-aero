@@ -1,7 +1,7 @@
 {
   "NACA": "0015",
   "Re": 135743,
-  "polarSource": "xfoil",
+  "polarSource": "exp",
   "omega": 0.01,
   "A_heaving": 0.5,
   "theta0": 0,

@@ -187,8 +187,14 @@ while not exit :
 
     # Exp command
     elif cmd in ["exp"]:
-        if OS == "Linux":
-            os.system("ls data_exp/*")
+        # if OS == "Linux":
+        #     os.system("ls data_exp/*")
+        # elif OS == "Windows":
+        for d in os.listdir("data_exp") :
+            print(d)
+            for dd in os.listdir("data_exp/"+d):
+                print("     "+dd)
+            print()
 
     # Help command
     elif cmd in ["h","help"]:
